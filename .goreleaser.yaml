@@ -1,0 +1,18 @@
+project_name: go-updater
+builds:
+  - env: [CGO_ENABLED=0]
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+nfpms:
+- maintainer: Jay Townsend <jay@cybermon.uk>
+  description: A Go program that installs and updates golang programming language.
+  homepage: https://github.com/L1ghtn1ng/go-updater
+  license: GPLv3
+  formats:
+  - deb
+  - rpm
+  - archlinux
