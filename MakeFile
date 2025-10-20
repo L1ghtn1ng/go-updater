@@ -2,7 +2,7 @@ BINARY=go-updater
 
 all: build
 
-build: build-x86_64 build-arm64
+build: build-x86_64 build-arm64 build-darwin-arm64
 
 build-x86_64:
 	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o $(BINARY)_x86_64
@@ -10,8 +10,11 @@ build-x86_64:
 build-arm64:
 	GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o $(BINARY)_arm64
 
+build-darwin-arm64:
+	GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o $(BINARY)_darwin_arm64
+
 clean:
-	@rm -f $(BINARY)_x86_64 $(BINARY)_arm64
+	@rm -f $(BINARY)_x86_64 $(BINARY)_arm64 $(BINARY)_darwin_x86_64 $(BINARY)_darwin_arm64
 
 debug-amd64:
 	@export GOFLAGS=-gcflags="all=-N -l"
@@ -23,8 +26,14 @@ debug-arm64:
 	@echo "Building Debug ARM64 Binary"
 	GOOS=linux GOARCH=arm64 go build -ldflags "-X main.BuildTime=`date -u '+%Y-%m-%d_%I:%M:%S%p'`" -o $(BINARY)-debug-arm64 main.go
 
+darwin-debug-arm64:
+	@export GOFLAGS=-gcflags="all=-N -l"
+	@echo "Building Darwin Debug ARM64 Binary"
+	GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.BuildTime=`date -u '+%Y-%m-%d_%I:%M:%S%p'`" -o $(BINARY)-darwin-debug-arm64 main.go
+
 # Clean Debug Binary
 clean-debug:
 	@echo "Cleaning Debug Binaries"
 	@rm -f $(BINARY)-debug-amd64
 	@rm -f $(BINARY)-debug-arm64
+	@rm -f $(BINARY)-darwin-debug-arm64

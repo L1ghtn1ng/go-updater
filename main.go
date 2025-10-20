@@ -32,7 +32,7 @@ func main() {
 		version, err = fetchLatestVersion()
 		must(err, "fetch latest version")
 	} else {
-		// Sanitize and normalize user-supplied version (handles pasted text with timestamps, etc.)
+		// Sanitize and normalize a user-supplied version (handles pasted text with timestamps, etc.)
 		version = cleanVersionInput(*versionFlag)
 	}
 
@@ -89,11 +89,11 @@ func main() {
 				warn("system-wide PATH update failed: %v", err)
 			}
 		}
-		// Make current process aware for immediate verification
+		// Make the current process aware for immediate verification
 		os.Setenv("PATH", os.Getenv("PATH")+string(os.PathListSeparator)+"/usr/local/go/bin")
 	}
 
-	// Verify installation using absolute path (PATH-independent)
+	// Verify installation using an absolute path (PATH-independent)
 	out, err := exec.Command("/usr/local/go/bin/go", "version").CombinedOutput()
 	must(err, "verify: running '/usr/local/go/bin/go version'\nOutput: %s", string(out))
 	fmt.Print(string(out))
@@ -103,7 +103,7 @@ func main() {
 	}
 
 	log("Go %s installed successfully.", version)
-	log("Note: You may need to start a new shell session for PATH changes to take effect, or run: source $HOME/.profile")
+	log("Note: You may need to start a new shell session for PATH changes to take effect, or run: 'source ~/.profile' (Linux) or 'source ~/.zprofile' (macOS)")
 }
 
 func fetchLatestVersion() (string, error) {
@@ -165,7 +165,7 @@ func downloadFile(url, toPath string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "go-updater/1.0 (+https://go.dev)")
+	req.Header.Set("User-Agent", "go-updater/1.0 (https://github.com/L1ghtn1ng/go-updater)")
 
 	client := &http.Client{Timeout: 0}
 	resp, err := client.Do(req)
@@ -187,31 +187,62 @@ func ensureUserPath() error {
 	if err != nil {
 		return err
 	}
-	prof := filepath.Join(home, ".profile")
 	line := "export PATH=$PATH:/usr/local/go/bin"
 
-	// If file exists and already contains the line, do nothing
-	if data, err := os.ReadFile(prof); err == nil {
-		if containsProfileLine(string(data), line) {
-			log("User PATH already contains /usr/local/go/bin in %s", prof)
+	var candidates []string
+	if runtime.GOOS == "darwin" {
+		candidates = []string{".zprofile", ".zshrc", ".bash_profile", ".profile"}
+	} else {
+		candidates = []string{".profile"}
+	}
+
+	// If any existing file already contains the PATH, do nothing.
+	for _, name := range candidates {
+		path := filepath.Join(home, name)
+		if data, err := os.ReadFile(path); err == nil {
+			if containsProfileLine(string(data), line) {
+				log("User PATH already contains /usr/local/go/bin in %s", path)
+				return nil
+			}
+		}
+	}
+
+	// Append to the first existing file among candidates.
+	for _, name := range candidates {
+		path := filepath.Join(home, name)
+		if _, err := os.Stat(path); err == nil {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			writer := bufio.NewWriter(f)
+			fmt.Fprintln(writer)
+			fmt.Fprintln(writer, "# Added by go-updater to expose Go binaries")
+			fmt.Fprintln(writer, line)
+			if err := writer.Flush(); err != nil {
+				return err
+			}
+			log("Added PATH update to %s", path)
 			return nil
 		}
 	}
 
-	profileFile, err := os.OpenFile(prof, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	// Otherwise create the first candidate and write to it.
+	target := filepath.Join(home, candidates[0])
+	f, err := os.OpenFile(target, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer profileFile.Close()
-
-	writer := bufio.NewWriter(profileFile)
+	defer f.Close()
+	writer := bufio.NewWriter(f)
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "# Added by go-updater to expose Go binaries")
 	fmt.Fprintln(writer, line)
 	if err := writer.Flush(); err != nil {
 		return err
 	}
-	log("Added PATH update to %s", prof)
+	log("Added PATH update to %s", target)
 	return nil
 }
 
@@ -231,7 +262,40 @@ func containsProfileLine(content, target string) bool {
 }
 
 func ensureSystemPath() error {
-	// Best-effort: write a small profile.d script via sudo install
+	if runtime.GOOS == "darwin" {
+		// Prefer /etc/paths.d on macOS
+		content := "/usr/local/go/bin\n"
+
+		tmp, err := os.CreateTemp("", "golang-path-*.txt")
+		if err != nil {
+			return err
+		}
+		tmpPath := tmp.Name()
+		if _, err := tmp.WriteString(content); err != nil {
+			tmp.Close()
+			return err
+		}
+		tmp.Close()
+
+		// Try /etc/paths.d first
+		if err := runAsRoot("install", "-m", "0644", tmpPath, "/etc/paths.d/go"); err == nil {
+			os.Remove(tmpPath)
+			log("Added system PATH at /etc/paths.d/go")
+			return nil
+		}
+
+		// Fallback: append to /etc/zprofile
+		cmd := fmt.Sprintf("printf '%s' >> /etc/zprofile", strings.ReplaceAll("export PATH=\"$PATH:/usr/local/go/bin\"\n", "'", "'\\''"))
+		if err := runAsRoot("sh", "-c", cmd); err != nil {
+			os.Remove(tmpPath)
+			return fmt.Errorf("failed to update /etc/paths.d or /etc/zprofile: %w", err)
+		}
+		os.Remove(tmpPath)
+		log("Appended system PATH to /etc/zprofile")
+		return nil
+	}
+
+	// Linux and others: use /etc/profile.d
 	content := "# /etc/profile.d/golang-path.sh\n# Added by go-updater\nexport PATH=\"$PATH:/usr/local/go/bin\"\n"
 
 	tmp, err := os.CreateTemp("", "golang-path-*.sh")
@@ -275,7 +339,7 @@ func runAsRoot(cmd string, args ...string) error {
 	if _, err := exec.LookPath("sudo"); err != nil {
 		return errors.New("this action requires root; please re-run with sudo")
 	}
-	// Try to refresh sudo timestamp to avoid multiple prompts
+	// Try to refresh the sudo timestamp to avoid multiple prompts
 	_ = exec.Command("sudo", "-v").Run()
 
 	argv := append([]string{cmd}, args...)
@@ -297,9 +361,13 @@ func printPlan(version, goos, goarch, url, tarPath string, noPath, system bool) 
 	fmt.Println("- Remove any previous /usr/local/go")
 	fmt.Printf("- Extract archive into /usr/local\n")
 	if !noPath {
-		fmt.Println("- Add '/usr/local/go/bin' to PATH in $HOME/.profile (idempotent)")
+		fmt.Println("- Add '/usr/local/go/bin' to PATH in your shell profile (idempotent)")
 		if system {
-			fmt.Println("- Also add system-wide PATH in /etc/profile.d (requires sudo)")
+			if goos == "darwin" {
+				fmt.Println("- Also add system-wide PATH via /etc/paths.d (requires sudo)")
+			} else {
+				fmt.Println("- Also add system-wide PATH via /etc/profile.d (requires sudo)")
+			}
 		}
 	} else {
 		fmt.Println("- Skip PATH update (per --no-path-update)")
@@ -366,7 +434,7 @@ func cleanVersionInput(versionInput string) string {
 // It prefers /usr/local/go/bin/go (managed by this installer) and falls back
 // to any 'go' found in PATH. It returns a version string like 'go1.25.1'.
 func getInstalledGoVersion() (string, error) {
-	// Prefer the standard install location first
+	// Prefer the standard installation location first
 	const stdGo = "/usr/local/go/bin/go"
 	if fi, err := os.Stat(stdGo); err == nil && !fi.IsDir() {
 		out, err := exec.Command(stdGo, "version").CombinedOutput()
