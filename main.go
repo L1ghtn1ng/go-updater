@@ -17,7 +17,7 @@ import (
 
 func main() {
 	var (
-		versionFlag     = flag.String("version", "", "Go version to install, e.g. 'go1.25.1'. If empty, the latest version is used.")
+		versionFlag     = flag.String("version", "", "Go version to install, e.g. 'go1.26.0'. If empty, the latest version is used.")
 		dryRunFlag      = flag.Bool("dry-run", false, "Only print actions without executing them.")
 		noPathUpdate    = flag.Bool("no-path-update", false, "Do not modify profile files to add /usr/local/go/bin to PATH.")
 		systemPathFlag  = flag.Bool("system", false, "Also add PATH entry system-wide under /etc/profile.d (requires sudo).")
@@ -108,7 +108,7 @@ func main() {
 
 func fetchLatestVersion() (string, error) {
 	const vURL = "https://go.dev/VERSION?m=text"
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := new(http.Client{Timeout: 15 * time.Second})
 	resp, err := client.Get(vURL)
 	if err != nil {
 		return "", err
@@ -167,7 +167,7 @@ func downloadFile(url, toPath string) error {
 	}
 	req.Header.Set("User-Agent", "go-updater/1.0 (https://github.com/L1ghtn1ng/go-updater)")
 
-	client := &http.Client{Timeout: 0}
+	client := new(http.Client{Timeout: 0})
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ func ensureUserPath() error {
 
 func containsProfileLine(content, target string) bool {
 	// consider whitespace variations
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
 		if line == target {
 			return true
@@ -335,7 +335,6 @@ func runAsRoot(cmd string, args ...string) error {
 		return execCmd.Run()
 	}
 
-	// Ensure sudo is available
 	if _, err := exec.LookPath("sudo"); err != nil {
 		return errors.New("this action requires root; please re-run with sudo")
 	}
@@ -403,7 +402,7 @@ func cleanVersionInput(versionInput string) string {
 	if versionInput == "" {
 		return versionInput
 	}
-	// Take the first token (users may paste: "go1.25.1 time 2025-08-27T15:49:40Z")
+	// Take the first token (users may paste: "go1.26.0 time 2025-08-27T15:49:40Z")
 	fields := strings.Fields(versionInput)
 	if len(fields) > 0 {
 		versionInput = fields[0]
@@ -415,7 +414,7 @@ func cleanVersionInput(versionInput string) string {
 	// Keep only allowed characters after 'go': digits, lowercase letters (rc/beta), and dots
 	bytesVersion := []byte(versionInput)
 	out := make([]byte, 0, len(bytesVersion))
-	for idx := 0; idx < len(bytesVersion); idx++ {
+	for idx := range bytesVersion {
 		charByte := bytesVersion[idx]
 		if idx < 2 { // always keep the 'g' and 'o'
 			out = append(out, charByte)
@@ -432,7 +431,7 @@ func cleanVersionInput(versionInput string) string {
 
 // getInstalledGoVersion tries to detect the currently installed Go version.
 // It prefers /usr/local/go/bin/go (managed by this installer) and falls back
-// to any 'go' found in PATH. It returns a version string like 'go1.25.1'.
+// to any 'go' found in PATH. It returns a version string like 'go1.26.0'.
 func getInstalledGoVersion() (string, error) {
 	// Prefer the standard installation location first
 	const stdGo = "/usr/local/go/bin/go"

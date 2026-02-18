@@ -14,7 +14,7 @@ Installer automates installing the latest Go per https://go.dev/doc/install
 
 ```sh
 go run .                 # install latest
-go run . --version go1.25.1
+go run . --version go1.26.0
 go run . --dry-run       # show what would be done
 go run . --system        # also add a system-wide PATH entry (requires sudo)
 ```
