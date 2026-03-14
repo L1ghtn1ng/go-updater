@@ -15,6 +15,13 @@ import (
 	"time"
 )
 
+func firstField(input string) string {
+	for field := range strings.FieldsSeq(strings.TrimSpace(input)) {
+		return field
+	}
+	return ""
+}
+
 func main() {
 	var (
 		versionFlag     = flag.String("version", "", "Go version to install, e.g. 'go1.26.0'. If empty, the latest version is used.")
@@ -403,9 +410,8 @@ func cleanVersionInput(versionInput string) string {
 		return versionInput
 	}
 	// Take the first token (users may paste: "go1.26.0 time 2025-08-27T15:49:40Z")
-	fields := strings.Fields(versionInput)
-	if len(fields) > 0 {
-		versionInput = fields[0]
+	if firstToken := firstField(versionInput); firstToken != "" {
+		versionInput = firstToken
 	}
 	// Ensure prefix
 	if !strings.HasPrefix(versionInput, "go") {
@@ -458,19 +464,25 @@ func getInstalledGoVersion() (string, error) {
 
 // parseGoVersionOutput extracts the 'goX.Y[.Z...]' token from `go version` output.
 func parseGoVersionOutput(output string) (string, error) {
-	fields := strings.Fields(strings.TrimSpace(output))
-	// Typical: "go version go1.22.6 linux/amd64"
-	if len(fields) >= 3 && strings.HasPrefix(fields[2], "go") {
-		return cleanVersionInput(fields[2]), nil
-	}
-	// Fallback: scan for any token beginning with 'go'
-	for _, token := range fields {
+	var fallback string
+	fieldIndex := 0
+	for token := range strings.FieldsSeq(strings.TrimSpace(output)) {
+		// Typical: "go version go1.22.6 linux/amd64"
+		if fieldIndex == 2 && strings.HasPrefix(token, "go") {
+			return cleanVersionInput(token), nil
+		}
+		// Fallback: scan for any token beginning with 'go'
 		if strings.HasPrefix(token, "go") {
 			versionToken := cleanVersionInput(token)
 			if strings.HasPrefix(versionToken, "go") && len(versionToken) > 2 {
-				return versionToken, nil
+				fallback = versionToken
+				break
 			}
 		}
+		fieldIndex++
+	}
+	if fallback != "" {
+		return fallback, nil
 	}
 	return "", fmt.Errorf("unable to parse version from: %q", output)
 }

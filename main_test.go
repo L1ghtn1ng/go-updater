@@ -90,3 +90,22 @@ func TestContainsProfileLine(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkCleanVersionInput(b *testing.B) {
+	input := "go1.26.1 time 2026-02-10T15:04:05Z"
+
+	for b.Loop() {
+		_ = cleanVersionInput(input)
+	}
+}
+
+func BenchmarkParseGoVersionOutput(b *testing.B) {
+	output := "go version go1.26.1 linux/amd64"
+
+	for b.Loop() {
+		_, err := parseGoVersionOutput(output)
+		if err != nil {
+			b.Fatalf("parseGoVersionOutput(%q) returned error: %v", output, err)
+		}
+	}
+}
