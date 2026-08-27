@@ -24,7 +24,7 @@ func firstField(input string) string {
 
 func main() {
 	var (
-		versionFlag     = flag.String("version", "", "Go version to install, e.g. 'go1.26.0'. If empty, the latest version is used.")
+		versionFlag     = flag.String("version", "", "Go version to install in 'goMAJOR.MINOR.PATCH' format. If empty, the latest version is used.")
 		dryRunFlag      = flag.Bool("dry-run", false, "Only print actions without executing them.")
 		noPathUpdate    = flag.Bool("no-path-update", false, "Do not modify profile files to add /usr/local/go/bin to PATH.")
 		systemPathFlag  = flag.Bool("system", false, "Also add PATH entry system-wide under /etc/profile.d (requires sudo).")
@@ -409,7 +409,7 @@ func cleanVersionInput(versionInput string) string {
 	if versionInput == "" {
 		return versionInput
 	}
-	// Take the first token (users may paste: "go1.26.0 time 2025-08-27T15:49:40Z")
+	// Take the first token when users paste a version followed by release metadata.
 	if firstToken := firstField(versionInput); firstToken != "" {
 		versionInput = firstToken
 	}
@@ -437,7 +437,7 @@ func cleanVersionInput(versionInput string) string {
 
 // getInstalledGoVersion tries to detect the currently installed Go version.
 // It prefers /usr/local/go/bin/go (managed by this installer) and falls back
-// to any 'go' found in PATH. It returns a version string like 'go1.26.0'.
+// to any 'go' found in PATH. It returns a full Go release version string.
 func getInstalledGoVersion() (string, error) {
 	// Prefer the standard installation location first
 	const stdGo = "/usr/local/go/bin/go"
