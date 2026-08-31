@@ -19,7 +19,7 @@ func TestCleanVersionInput(t *testing.T) {
 		{"1.24beta1", "go1.24beta1"},
 		{"go1.25.1rc1 extra", "go1.25.1rc1"},
 		{"go1.25.1!", "go1.25.1"},
-		{"go", "go"}, // minimal allowed form per sanitizer
+		{"go", "go"},
 	}
 
 	for _, tt := range tests {
@@ -88,6 +88,13 @@ func TestContainsProfileLine(t *testing.T) {
 				t.Errorf("containsProfileLine(%q, %q) = %v; want %v", tt.content, exact, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolveGoTargetRejects32Bit(t *testing.T) {
+	t.Parallel()
+	if _, _, err := resolveGoTarget("linux", "386"); err == nil {
+		t.Fatal("resolveGoTarget(linux/386) error = nil, want unsupported architecture")
 	}
 }
 

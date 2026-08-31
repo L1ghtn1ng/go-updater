@@ -82,8 +82,8 @@ nupkg/
 [Rr]elease/
 [Rr]eleases/
 x64/
-x86/
 build/
+/dist/
 bld/
 [Bb]in/
 [Oo]bj/
@@ -101,7 +101,7 @@ msbuild.wrn
 *_LOCAL_*.txt
 *_REMOTE_*.txt
 [._]*.s[a-v][a-z]
-!*.svg  # comment out if you don't need vector files
+!*.svg
 [._]*.sw[a-p]
 [._]s[a-rt-v][a-z]
 [._]ss[a-gi-z]
